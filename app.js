@@ -5,8 +5,24 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const tasks = fs.readFileSync('task.json');
-const tasksData = JSON.parse(tasks).tasks;
+try {
+    if (fs.existsSync('task.json')) {
+        const fileContent = fs.readFileSync('task.json', 'utf8');
+        const parsed = JSON.parse(fileContent);
+        if (parsed && Array.isArray(parsed.tasks)) {
+            tasksData = parsed.tasks;
+        } else {
+            console.error("task.json found but structure is invalid. Using empty tasks array.");
+            tasksData = [];
+        }
+    } else {
+        console.warn("task.json not found. Starting with empty tasks array.");
+        tasksData = [];
+    }
+} catch (error) {
+    console.error("Error reading task.json:", error.message);
+    tasksData = [];
+}
 
 let id = tasksData.length + 1;
 const validPriorities = ['low', 'medium', 'high'];
@@ -31,6 +47,7 @@ function validateTask( req, res, next) {
 
 
 app.get('/tasks', (req, res) => {
+    let result = [];
     if (req.query.completed !== undefined) {
         const completed = req.query.completed.toLowerCase() === 'true';
         result = tasksData.filter(task => task.completed === completed);
@@ -43,7 +60,7 @@ app.get('/tasks', (req, res) => {
 
 app.get('/tasks/:id', (req, res) => {
     const task = getTaskById(req.params.id);
-    if(!task) res.status(404).send("The task with the given ID was not found");
+    if(!task) return res.status(404).send("The task with the given ID was not found");
     res.send(task);
 });
 
@@ -81,7 +98,7 @@ app.delete('/tasks/:id', (req, res) => {
     const taskIndex = tasksData.findIndex(task => task.id === parseInt(req.params.id));
     if(taskIndex === -1) return res.status(404).send("The task with the given ID was not found");
     tasksData.splice(taskIndex, 1);
-    res.send("Task deleted successfully");
+    res.status(200).send("Task deleted successfully");
 });
 
 module.exports = app;
